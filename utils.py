@@ -3,6 +3,7 @@ import os
 import sys
 import tempfile
 import requests
+import zipfile
 
 # Define the logger
 logger = logging.getLogger(__name__)
@@ -38,9 +39,31 @@ def download_zip_archive(link, temp_zip_file):
 
     logger.info('Zip archive downloaded successfully.')
 
+# Define a function to extract a zip archive to temporary storage
+def extract_zip_archive(temp_zip_file):
+    """Extracts a zip archive to temporary storage.
+
+    Args:
+        temp_zip_file (str): The path to the temporary zip archive to extract.
+
+    Returns:
+        str: The path to the temporary directory containing the extracted files.
+    """
+
+    logger.info('Extracting zip archive: {}'.format(temp_zip_file))
+
+    temp_dir = tempfile.mkdtemp()
+
+    with zipfile.ZipFile(temp_zip_file, 'r') as zip_file:
+        zip_file.extractall(temp_dir)
+
+    logger.info('Zip archive extracted successfully.')
+
+    return temp_dir
+
 # Define a function to main function
 def main():
-    """Downloads a zip archive from a link and saves it to a temporary file.
+    """Downloads a zip archive from a link and extracts it to temporary storage.
 
     Returns:
         None
@@ -55,15 +78,18 @@ def main():
     try:
         # Download the zip archive
         download_zip_archive(link, temp_zip_file.name)
+
+        # Extract the zip archive to temporary storage
+        temp_dir = extract_zip_archive(temp_zip_file.name)
+
+        # Print the path to the temporary directory
+        print(temp_dir)
     except Exception as e:
         logger.error(e)
         sys.exit(1)
 
-    # Close the temporary file
+    # Close the temporary zip file
     temp_zip_file.close()
-
-    # Print the path to the temporary file
-    print(temp_zip_file.name)
 
 # Call the main function if this script is being run directly
 if __name__ == '__main__':
