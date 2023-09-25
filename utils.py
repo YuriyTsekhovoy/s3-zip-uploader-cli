@@ -1,9 +1,9 @@
+import concurrent.futures
 import logging
 import os
 import shutil
 import sys
 import tempfile
-import threading
 import uuid
 import zipfile
 
@@ -184,17 +184,14 @@ def main():
         file_paths = list_all_file_paths(temp_dir)
 
         # Upload files from local dir to s3 bucket
-        threads = []
-        for file in file_paths:
-            s3_file = file.split(temp_dir)[1]
-            thread = threading.Thread(target=upload_files_to_s3, args=(file, s3_bucket_name, s3_file))
-            threads.append(thread)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            # Submit a task for each extracted file.
+            for file in file_paths:
+                s3_file = file.split(temp_dir)[1]
+                executor.submit(upload_files_to_s3, file, s3_bucket_name, s3_file)
 
-        for thread in threads:
-            thread.start()
-
-        for thread in threads:
-            thread.join()
+            # Wait for all tasks to complete.
+            executor.shutdown(wait=True)
 
         # Delete the local zip file and extracted files
         os.remove(temp_zip_file.name)
