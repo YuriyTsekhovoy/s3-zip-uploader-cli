@@ -9,6 +9,14 @@ import zipfile
 
 import boto3
 import requests
+from environs import Env
+
+env = Env()
+env.read_env()
+
+# Getting AWS credentials from .env variable
+AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY')
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -75,7 +83,10 @@ def create_s3_connection():
 
     logger.info('Creating S3 connection')
 
-    s3_resource = boto3.resource('s3')
+    s3_resource = boto3.resource('s3',
+                                 aws_access_key_id=AWS_ACCESS_KEY_ID,
+                                 aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+                                 )
     s3_connection = s3_resource.meta.client
 
     logger.info('S3 connection created successfully.')
