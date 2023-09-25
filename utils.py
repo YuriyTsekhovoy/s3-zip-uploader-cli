@@ -4,6 +4,8 @@ import sys
 import tempfile
 import requests
 import zipfile
+import boto3
+import uuid
 
 # Define the logger
 logger = logging.getLogger(__name__)
@@ -61,6 +63,49 @@ def extract_zip_archive(temp_zip_file):
 
     return temp_dir
 
+# Define a function to create an S3 connection
+def create_s3_connection():
+    """Creates an S3 connection.
+
+    Returns:
+        An S3 connection object.
+    """
+
+    logger.info('Creating S3 connection')
+
+    s3_resource = boto3.resource('s3')
+    s3_connection=s3_resource.meta.client
+
+    logger.info('S3 connection created successfully.')
+
+    return s3_connection
+
+# Define a function to create an S3 bucket
+def create_s3_bucket(s3_connection):
+    """Creates an S3 bucket.
+
+    Args:
+        s3_connection: An S3 client object.
+
+    Returns:
+        None
+    """
+
+    bucket_prefix = 'extracted-zip'
+    bucket_name = '-'.join([bucket_prefix, str(uuid.uuid4())])
+    logger.info('Creating S3 bucket: {}'.format(bucket_name))
+    try:
+        session = boto3.session.Session()
+        current_region = session.region_name
+        s3_connection.create_bucket(
+            Bucket=bucket_name,
+            CreateBucketConfiguration={
+                'LocationConstraint': current_region})
+    except Exception as e:
+        raise Exception('Failed to create S3 bucket: {}'.format(e))
+
+    logger.info('S3 bucket created successfully.')
+
 # Define a function to main function
 def main():
     """Downloads a zip archive from a link and extracts it to temporary storage.
@@ -84,6 +129,13 @@ def main():
 
         # Print the path to the temporary directory
         print(temp_dir)
+
+        # Create s3 connection
+        s3_connection = create_s3_connection()
+
+        # Create s3 bucket
+        create_s3_bucket(s3_connection)
+
     except Exception as e:
         logger.error(e)
         sys.exit(1)
