@@ -30,7 +30,8 @@ This script will:
 * environs
 
 ***Installation:***
-**Create a virtual environment***
+
+**Create a virtual environment**
 
 ```
 python3.9 -m venv venv
@@ -43,16 +44,25 @@ This will create a new Python environment that is isolated from your system Pyth
 source venv/bin/activate
 ```
 This will activate the virtual environment. Once the virtual environment is activated, all Python commands will be run using the Python installation in the virtual environment.
+
+**Install the required Python packages**
 ```
 pip install -r requirements.txt
 ```
-
+This will install all the Python packages that are required by your project. The `requirements.txt` file is a list of all the Python packages that your project needs, along with their versions.
 
 **Build the project**
 ```
 python setup.py sdist bdist_wheel
 ```
 This will build your project into a distribution package. The distribution package can be installed on other systems using the pip install command.
+
+**Install the project**
+
+```
+pip install .
+```
+This will install your project inside the virtual environment.
 
 **AWS credentials:**
 
