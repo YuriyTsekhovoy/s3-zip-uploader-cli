@@ -1,13 +1,15 @@
 import logging
 import os
+import shutil
 import sys
 import tempfile
-import requests
-import zipfile
-import boto3
+import threading
 import uuid
+import zipfile
 
-# Define the logger
+import boto3
+import requests
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
@@ -18,7 +20,7 @@ formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(messag
 console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
-# Define a function to download a zip archive from a link
+
 def download_zip_archive(link, temp_zip_file):
     """Downloads a zip archive from a link and saves it to a temporary file.
 
@@ -41,7 +43,7 @@ def download_zip_archive(link, temp_zip_file):
 
     logger.info('Zip archive downloaded successfully.')
 
-# Define a function to extract a zip archive to temporary storage
+
 def extract_zip_archive(temp_zip_file):
     """Extracts a zip archive to temporary storage.
 
@@ -63,7 +65,7 @@ def extract_zip_archive(temp_zip_file):
 
     return temp_dir
 
-# Define a function to create an S3 connection
+
 def create_s3_connection():
     """Creates an S3 connection.
 
@@ -74,13 +76,13 @@ def create_s3_connection():
     logger.info('Creating S3 connection')
 
     s3_resource = boto3.resource('s3')
-    s3_connection=s3_resource.meta.client
+    s3_connection = s3_resource.meta.client
 
     logger.info('S3 connection created successfully.')
 
     return s3_connection
 
-# Define a function to create an S3 bucket
+
 def create_s3_bucket(s3_connection):
     """Creates an S3 bucket.
 
@@ -101,12 +103,44 @@ def create_s3_bucket(s3_connection):
             Bucket=bucket_name,
             CreateBucketConfiguration={
                 'LocationConstraint': current_region})
+        return bucket_name
     except Exception as e:
         raise Exception('Failed to create S3 bucket: {}'.format(e))
 
     logger.info('S3 bucket created successfully.')
 
-# Define a function to main function
+
+def list_all_file_paths(directory):
+    """Lists all file paths in a directory tree.
+    Args:
+        directory: The directory to list.
+    Returns:
+        A list of all file paths in the directory tree.
+    """
+    logger.info('Listing all file paths in: {}'.format(directory))
+
+    file_paths = []
+    for root, directories, files in os.walk(directory):
+        for file in files:
+            file_path = os.path.join(root, file)
+            file_paths.append(file_path)
+    return file_paths
+
+
+def upload_files_to_s3(local_file_path, s3_bucket_name, s3_key):
+    """Uploading files from temporary storage to S3 bucket"""
+    logger.info('Upload {} file to S3 bucket: {}'.format(local_file_path, s3_bucket_name))
+
+    s3 = boto3.client('s3')
+    try:
+        s3.upload_file(Filename=local_file_path, Bucket=s3_bucket_name, Key=s3_key)
+
+    except (IsADirectoryError, FileNotFoundError) as e:
+        raise Exception('Failed to upload file to S3 bucket: {}'.format(e))
+
+    logger.info('{} file uploaded successfully to S3 bucket: {}'.format(s3_key, s3_bucket_name))
+
+
 def main():
     """Downloads a zip archive from a link and extracts it to temporary storage.
 
@@ -127,14 +161,35 @@ def main():
         # Extract the zip archive to temporary storage
         temp_dir = extract_zip_archive(temp_zip_file.name)
 
-        # Print the path to the temporary directory
-        print(temp_dir)
+        logger.info('Files extracted to {}'.format(temp_dir))
 
         # Create s3 connection
         s3_connection = create_s3_connection()
 
         # Create s3 bucket
-        create_s3_bucket(s3_connection)
+        s3_bucket_name = create_s3_bucket(s3_connection)
+
+        # List file paths
+        file_paths = list_all_file_paths(temp_dir)
+
+        # Upload files from local dir to s3 bucket
+        threads = []
+        for file in file_paths:
+            s3_file = file.split(temp_dir)[1]
+            thread = threading.Thread(target=upload_files_to_s3, args=(file, s3_bucket_name, s3_file))
+            threads.append(thread)
+
+        for thread in threads:
+            thread.start()
+
+        for thread in threads:
+            thread.join()
+
+        # Delete the local zip file and extracted files
+        os.remove(temp_zip_file.name)
+        shutil.rmtree(temp_dir)
+        logger.info('Local zip file and extracted files have been deleted')
+
 
     except Exception as e:
         logger.error(e)
@@ -142,6 +197,7 @@ def main():
 
     # Close the temporary zip file
     temp_zip_file.close()
+
 
 # Call the main function if this script is being run directly
 if __name__ == '__main__':
