@@ -1,75 +1,70 @@
-import argparse
-import concurrent.futures
 import logging
-import boto3
+import os
+import sys
+import tempfile
+import requests
 
-def upload_file_to_s3(s3_client, bucket_name, object_key, file_path):
-    """Uploads a file to S3.
+# Define the logger
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
-    Args:
-        s3_client: A boto3 S3 client.
-        bucket_name: The name of the S3 bucket.
-        object_key: The key of the object in S3.
-        file_path: The path to the file to upload.
-    """
+# Create a console handler and add it to the logger
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+console_handler.setFormatter(formatter)
+logger.addHandler(console_handler)
 
-    with open(file_path, "rb") as f:
-        s3_client.upload_fileobj(f, bucket_name, object_key)
-
-def upload_zip_archive_to_s3(s3_client, bucket_name, zip_archive_url, concurrency):
-    """Uploads a ZIP archive to S3 with concurrency.
-
-    Args:
-        s3_client: A boto3 S3 client.
-        bucket_name: The name of the S3 bucket.
-        zip_archive_url: The URL of the ZIP archive.
-        concurrency: The number of concurrent uploads.
-    """
-
-    logging.info("Downloading ZIP archive from %s", zip_archive_url)
-    with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency) as executor:
-        futures = []
-        for file_path in extract_zip_archive(zip_archive_url):
-            future = executor.submit(upload_file_to_s3, s3_client, bucket_name, file_path, file_path)
-            futures.append(future)
-
-        for future in concurrent.futures.as_completed(futures):
-            future.result()
-
-def extract_zip_archive(zip_archive_url):
-    """Extracts a ZIP archive.
+# Define a function to download a zip archive from a link
+def download_zip_archive(link, temp_zip_file):
+    """Downloads a zip archive from a link and saves it to a temporary file.
 
     Args:
-        zip_archive_url: The URL of the ZIP archive.
+        link (str): The link to the zip archive.
+        temp_zip_file (str): The path to the temporary file to save the zip archive to.
 
     Returns:
-        A list of the paths to the extracted files.
+        None
     """
 
-    import requests
-    import zipfile
+    logger.info('Downloading zip archive from link: {}'.format(link))
 
-    logging.info("Extracting ZIP archive")
-    response = requests.get(zip_archive_url)
-    with zipfile.ZipFile(response.content) as zip_file:
-        zip_file.extractall()
+    response = requests.get(link)
+    if response.status_code != 200:
+        raise Exception('Failed to download zip archive: {}. Status code: {}'.format(link, response.status_code))
 
-    return zip_file.namelist()
+    with open(temp_zip_file, 'wb') as f:
+        f.write(response.content)
 
+    logger.info('Zip archive downloaded successfully.')
+
+# Define a function to main function
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--zip-archive-url", required=True, help="The URL of the ZIP archive to upload.")
-    parser.add_argument("--bucket-name", required=True, help="The name of the S3 bucket to upload the files to.")
-    parser.add_argument("--concurrency", type=int, default=10, help="The number of concurrent uploads.")
-    parser.add_argument("--verbose", action="store_true", help="Enable verbose logging.")
+    """Downloads a zip archive from a link and saves it to a temporary file.
 
-    args = parser.parse_args()
+    Returns:
+        None
+    """
 
-    logging.basicConfig(level=logging.INFO if args.verbose else logging.WARN)
+    # Get the link to the zip archive from the command line arguments
+    link = sys.argv[1]
 
-    s3_client = boto3.client("s3")
+    # Create a temporary file to save the zip archive to
+    temp_zip_file = tempfile.NamedTemporaryFile(suffix='.zip', delete=False)
 
-    upload_zip_archive_to_s3(s3_client, args.bucket_name, args.zip_archive_url, args.concurrency)
+    try:
+        # Download the zip archive
+        download_zip_archive(link, temp_zip_file.name)
+    except Exception as e:
+        logger.error(e)
+        sys.exit(1)
 
-if __name__ == "__main__":
+    # Close the temporary file
+    temp_zip_file.close()
+
+    # Print the path to the temporary file
+    print(temp_zip_file.name)
+
+# Call the main function if this script is being run directly
+if __name__ == '__main__':
     main()
