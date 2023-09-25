@@ -5,13 +5,13 @@
 **Usage:**
 
 ```
-python upload_files_to_s3.py <link to zip archive>
+s3_zip_uploader_cli <link to zip archive>
 ```
 
 **Example:**
 
 ```
-python upload_files_to_s3.py https://example.com/archive.zip
+s3_zip_uploader_cli https://example.com/archive.zip
 ```
 
 This script will:
@@ -29,17 +29,30 @@ This script will:
 * requests
 * environs
 
-**Installation:**
+***Installation:***
+**Create a virtual environment***
 
+```
+python3.9 -m venv venv
+```
+
+This will create a new Python environment that is isolated from your system Python environment. This is useful for avoiding conflicts with other Python packages that you may have installed.
+
+**Activate the virtual environment**
+```
+source venv/bin/activate
+```
+This will activate the virtual environment. Once the virtual environment is activated, all Python commands will be run using the Python installation in the virtual environment.
 ```
 pip install -r requirements.txt
 ```
 
-**Running:**
 
+**Build the project**
 ```
-python upload_files_to_s3.py <link to zip archive>
+python setup.py sdist bdist_wheel
 ```
+This will build your project into a distribution package. The distribution package can be installed on other systems using the pip install command.
 
 **AWS credentials:**
 
@@ -53,6 +66,12 @@ AWS_SECRET_ACCESS_KEY=<your AWS secret access key>
 ```
 
 Then, place the `.env` file in the same directory as this script.
+
+**Running:**
+
+```
+s3_zip_uploader_cli <link to zip archive>
+```
 
 **Troubleshooting:**
 
